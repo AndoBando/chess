@@ -47,7 +47,7 @@ piecetype ptfromc(char c){
   case '_':
     return None;
   default:
-    printf("Error, tried to read %c as piece\n",c);
+    fprintf(stderr, "Error, tried to read %c as piece\n",c);
     exit(1);
   }
 }
@@ -68,7 +68,7 @@ char cfrompt(piecetype p){
   case None:
     return ' ';
   default:
-    printf("Error, invalid piece enum\n");
+    fprintf(stderr, "Error, invalid piece enum, read %d\n",p);
     exit(1);
   }
 }
@@ -80,7 +80,7 @@ color clfromc(char c){
   case 'B':
     return Black;
   default:
-    printf("Error, invalid color enum\n");
+    fprintf(stderr, "Error, invalid color char, read %c\n",c);
     exit(1);
   }
 }
@@ -90,7 +90,7 @@ char ffromc(char c){
     return c - 'a';
   else if (c == '_')
     return NOINFO;
-  printf("Error, not a valid file\n");
+  fprintf(stderr, "Error, not a valid file char, read %c\n",c);
   exit(1);
 }
 
@@ -100,7 +100,7 @@ char rfromc(char c){
     return c - '1';
   else if (c == '_')
     return NOINFO;
-  printf("Error, not a valid file\n");
+  fprintf(stderr, "Error, not a valid rank char, read %c\n",c);
   exit(1);
 }
 
@@ -120,32 +120,32 @@ move readmove(){
 
   m.to.file = ffromc(getchar());
   m.to.rank = rfromc(getchar());
- 
-  switch (getchar()){
+
+  char c;
+  switch (c = getchar()){
   case '_':
     m.takes = 0; break;
   case 'x':
     m.takes = 1; break;
   default:
-    printf("Error, invalid takes char\n");
+    fprintf(stderr, "Error, invalid takes char, read %c\n",c);
     exit(1);
   }
 
   
-  switch (getchar()){
+  switch (c = getchar()){
   case '_':
     m.checks = 0; break;
   case '+':
   case '#':
     m.checks = 1; break;
   default:
-    printf("Error, invalid check char\n");
+    fprintf(stderr, "Error, invalid check char, read %c\n",c);
     exit(1);
   }
 
   m.promote.c = m.piece.c; /* promoting piece keeps color */
   m.promote.p = ptfromc(getchar());
-  assert(m.promote.p == None); 
 
   return m;
 }
@@ -154,6 +154,7 @@ move readmove(){
 typedef struct{
   piece board[8][8];
   short fullmoves;
+  int gameid;
   short halfmoveclock;
   square epsquare;
   color tomove;
@@ -164,9 +165,9 @@ typedef struct{
   char bqcastle;
 } boardstate;
 
-boardstate newboard(){
+boardstate newboard(int gameid){
   boardstate b;
-
+  b.gameid = gameid;
   for(char i = 0; i < 8; i++){
     b.board[i][1] = (piece){Pawn, White};
     b.board[i][6] = (piece){Pawn, Black};
@@ -190,7 +191,6 @@ boardstate newboard(){
   b.fullmoves = 1;
   b.halfmoveclock = 0;
 
-  b.epsquare = (square){0xF,0xF};
   b.tomove = White;
 
   b.canep = 0;
@@ -199,38 +199,45 @@ boardstate newboard(){
   return b;
 }
 
-void prettyprintboard(boardstate b){
-  printf("%d. %s to play\n",b.fullmoves,b.tomove == White? "White": "Black");
-  printf(KYEL);
-  printf("╔═════════════════╗\n");
-  printf(KNRM);
+void fprettyprintboard(FILE* stream, boardstate b){
+  fprintf(stream, "%d. %s to play (Game %d),\n",b.fullmoves,b.tomove == White? "White": "Black",b.gameid);
+
+  fprintf(stream,KYEL"╔═════════════════╗\n"KNRM);
+
   for (int i = 7; i >= 0; --i){
-    printf(KYEL);
-    printf("║");
-    printf(KNRM);
+
+    fprintf(stream, KYEL"║"KNRM);
+
     for (int j = 0; j < 8; ++j){
       char c = 0;
       piece p = b.board[j][i];
       if (p.c == Black){
-        printf(KRED);
+        fprintf(stream,KRED);
         c += 'a' - 'A';
       }
+
       c += cfrompt(p.p);
-      putchar(' ');
-      putchar(c);
-      printf(KNRM);
+      if ( b.canep && j == b.epsquare.file && i == b.epsquare.rank)
+        fprintf(stream,KYEL" ."KNRM);
+      else
+        fprintf(stream," %c"KNRM,c);
     }
-    printf(KYEL);
-    printf(" ║  %c\n",i + '1');
-    printf(KNRM);
+    fprintf(stream,KYEL" ║  %c\n"KNRM,i + '1');
   }
-  printf(KYEL);
-  printf("╚═════════════════╝\n  a b c d e f g h\n");
-  printf(KNRM);
+  fprintf(stream, KYEL"╚═════════════════╝\n  a b c d e f g h"KNRM"\n");
+
+}
+
+void prettyprintboard(boardstate b){
+  fprettyprintboard(stdout,b);
 }
 
 char onboard(square s){
   return (s.rank >= 0 && s.rank < 8 && s.file >= 0 && s.file < 8);
+}
+
+void fprintsq(FILE *stream, square s){
+  fprintf(stream, "%c%c",s.file + 'a', s.rank + '1');
 }
 
 void printsq(square s){
@@ -261,7 +268,8 @@ squarelist pawncand(move m, boardstate b){
 
   
   from = (square){m.to.file, (m.piece.c? 1 : -1) + m.to.rank};
-  if (m.to.rank > 0 && samep(at(&b,from),m.piece)){
+
+  if (samep(at(&b,from),m.piece)){
     candidate.s[candidate.len] = from;
     candidate.len++;
   }
@@ -276,18 +284,26 @@ squarelist pawncand(move m, boardstate b){
 
   /* attacking moves */
   from = (square){m.to.file-1,(m.piece.c? 1 : -1) + m.to.rank};
-  
-  if (onboard(from) && samep(at(&b,from),m.piece) && at(&b,m.to).p != None && at(&b,m.to).c == other(m.piece.c)){
-    candidate.s[candidate.len] = from;
-    candidate.len++;
+  if (onboard(from) && samep(at(&b,from),m.piece)){
+    char validattack = at(&b,m.to).p != None && at(&b,m.to).c == other(m.piece.c);
+    char validep = b.canep && m.to.rank == b.epsquare.rank && m.to.file == b.epsquare.file;
+    if(validattack || validep){
+      candidate.s[candidate.len] = from;
+      candidate.len++;
+    }
   }
   
   from = (square){m.to.file+1,(m.piece.c? 1 : -1) + m.to.rank};
-  
-  if (onboard(from) && samep(at(&b,from),m.piece) && at(&b,m.to).p != None && at(&b,m.to).c == other(m.piece.c)){
-    candidate.s[candidate.len] = from;
-    candidate.len++;
+
+  if (onboard(from) && samep(at(&b,from),m.piece)){
+    char validattack = at(&b,m.to).p != None && at(&b,m.to).c == other(m.piece.c);
+    char validep = b.canep && m.to.rank == b.epsquare.rank && m.to.file == b.epsquare.file;
+    if(validattack || validep){
+      candidate.s[candidate.len] = from;
+      candidate.len++;
+    }
   }
+  
   return candidate;
 }
 
@@ -451,7 +467,7 @@ move* movecontext(move* p_m, boardstate b){
     p_m->to.rank = p_m->from.rank = p_m->piece.c? 7 : 0;
     return p_m;
   default:
-    printf("Error, invalid piece enum, or None piece given when illegal");
+    fprintf(stderr, "Error, invalid piece type enum, or None piece given when illegal, read %d",m.piece.p);
     exit(1);
   }
 
@@ -480,13 +496,16 @@ move* movecontext(move* p_m, boardstate b){
   }
   
   if (candidate.len != 1){
-    printf("ERROR, either no, or too many candidate positions\n");
-    printf("candidate origins : %d,  \t",candidate.len);
+    fprettyprintboard(stderr, b);
+    fprintf(stderr, "Error, either no, or too many candidate positions\n");
+    fprintf(stderr, "candidate origins : %d,  \t",candidate.len);
     for( int i = 0; i < candidate.len; ++i){
-      printsq(candidate.s[i]);
-      printf(" ");
+      fprintsq(stderr, candidate.s[i]);
+      fprintf(stderr, " ");
     }
-    printf("\n");
+    fprintf(stderr, "\n%c going to ",cfrompt(p_m->piece.p));
+    fprintsq(stderr, p_m->to);
+    fprintf(stderr,"\n");
     exit(1);
   }
   p_m->from = candidate.s[0];
@@ -512,6 +531,20 @@ boardstate* makemove(boardstate *p_b, move m){
     p_b->board[m.to.file][m.to.rank] = m.promote;
     assert(m.to.rank == m.piece.c? 0 : 7);
   }
+  /* if en passant, remove passing pawn */
+  if (p_b->canep && m.piece.p == Pawn && m.to.rank == p_b->epsquare.rank && m.to.file == p_b->epsquare.file){
+    p_b->board[m.to.file][m.piece.c? 3 : 4] = (piece){None,White};
+  } 
+  
+
+  /* set en passant target square square */
+  if (m.piece.p == Pawn && m.from.rank == (m.piece.c? 6 : 1) && m.to.rank == (m.piece.c? 4 : 3)){
+    p_b->canep = 1;
+    p_b->epsquare = (square){m.to.file, m.piece.c? 5 : 2};
+  }else{
+    p_b->canep = 0;
+  }
+    
   
   p_b->fullmoves = m.fullmoves;
   p_b->tomove = other(m.piece.c);
@@ -523,10 +556,10 @@ boardstate* makemove(boardstate *p_b, move m){
 void playmove(boardstate *p_b){
   move m = readmove();
   movecontext(&m,*p_b);
-  printsq(m.to);
+  /*printsq(m.to);
   printf("<-");
   printsq(m.from);
-  printf("\n");
+  printf("\n");*/
   makemove(p_b,m);
 }
 
@@ -539,7 +572,7 @@ void prettyendgame(char c){
   case('D'):
     printf("Draw!\n"); break;
   default:
-    printf("Error, bad char between moves\n");
+    fprintf(stderr,"Error, bad char between moves\n");
     exit(1);
   }
 }
@@ -547,17 +580,18 @@ void prettyendgame(char c){
 int main(){
   move m;
   char c;
-  boardstate b = newboard();
-  prettyprintboard(b);
-  printf("\n");
-  
+  int game = 0;
   do{
+    boardstate b = newboard(game);
+    prettyprintboard(b);
+    printf("\n");
     do{
       playmove(&b);
       prettyprintboard(b);
     } while ((c = getchar()) == '\t');
     prettyendgame(c);
-    assert(getchar() == '\n');
-  } while (getchar() != EOF);
-  printf("A\n");
+    game++;
+    assert((c = getchar()) == '\n' || c == EOF);
+  } while (c != EOF);
+  printf("Whew...\n");
 }

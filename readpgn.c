@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -156,10 +157,14 @@ move read_move(){
           } else if (c == '-' && next_char() == 'O') {
             c = next_char();
             m.to.file = 'c' - 'a';
-          } else
-            printf("BAD QUEENSIDE CASTLE IN READ_MOVE @ char c = %c (%x)\n", c, c);
-        } else
-          printf("BAD CASTLE IN READ_MOVE @ char c = %c (%x)\n", c, c);
+          } else{
+            fprintf(stderr, "BAD QUEENSIDE CASTLE IN READ_MOVE @ char c = %c (%x)\n", c, c);
+            exit(1);
+          }
+        } else {
+          fprintf(stderr, "BAD CASTLE IN READ_MOVE @ char c = %c (%x)\n", c, c);
+          exit(1);
+        }
         break;
 
       case '1':
@@ -180,8 +185,10 @@ move read_move(){
           m.move_num = 1;
         else if (c >= '0' && c <= '9')
           m.move_num = read_move_num(10 + c - '0');
-        else
-          printf("BAD WIN (1) IN READ_MOVE @ char c = %c (%x)\n", c, c);
+        else{
+          fprintf(stderr, "BAD WIN (1) IN READ_MOVE @ char c = %c (%x)\n", c, c);
+          exit(1);
+        }
         return m;
       case '0':
         if ((c = next_char()) == '-'
@@ -190,8 +197,8 @@ move read_move(){
           m.wins = BLACK;
           return m;
         }
-        printf("BAD WIN (1) IN READ_MOVE @ char c = %c (%x)\n", c, c);
-        return m;
+        fprintf(stderr, "BAD WIN (1) IN READ_MOVE @ char c = %c (%x)\n", c, c);
+        exit(1);
       default:
         if (is_file(c)) {
           m.p = Pawn;
@@ -200,8 +207,8 @@ move read_move(){
           m.move_num = read_move_num(c - '0');
           return m;
         } else {
-          printf("BAD READ_MOVE for piece char @ c = %c (%x)\n", c, c);
-          return m;
+          fprintf(stderr, "BAD READ_MOVE for piece char @ c = %c (%x)\n", c, c);
+          exit(1);
         }
     }
   }
@@ -241,8 +248,10 @@ move read_move(){
   else if (is_rank(c))
     m.d.rank = c - '1';  /* this is definitely a disambiguating rank, because we can't
                             have seen a file yet*/
-  else
-    printf("BAD 1st RANK-FILE CHAR IN READ_MOVE @ char c = %c (%x)\n",c,c);
+  else{
+    fprintf(stderr, "BAD 1st RANK-FILE CHAR IN READ_MOVE @ char c = %c (%x)\n",c,c);
+    exit(1);
+  }
 
 
   c = next_char();
@@ -257,13 +266,15 @@ move read_move(){
   if(is_rank(c)){
     m.to.rank = c - '1';
   } else if (is_file(c)){ /* if we get a file, if the previous file was set, it
-                                         it was disambiguating */
-    if (m.to.file != NOT_YET){
+                                         it was disambiguating, otherwise the previous rank was set */
+    if (m.to.file != NOT_YET)
       m.d.file = m.to.file;
-      m.to.file = c - 'a';
-    }
-  } else
-    printf("BAD 2nd RANK-FILE CHAR IN READ_MOVE @ char c = %c (%x)\n",c,c);
+    
+    m.to.file = c - 'a';
+  } else{
+    fprintf(stderr, "BAD 2nd RANK-FILE CHAR IN READ_MOVE @ char c = %c (%x)\n",c,c);
+    exit(1);
+  }
 
   c = next_char();
 
@@ -476,6 +487,7 @@ int main(){
   int plys = 0;
   int move_num;
   move m;
+  int games = 0;
   m.over = FALSE;
   while(!m.over) {
     plys = 0;
@@ -512,10 +524,12 @@ int main(){
         break;
       if(plys != 0)
         printf("\t");
+      else if (games != 0)
+        printf("\n");
       printf("%03d", move_num);
       printf("%c", plys % 2 ? 'B' : 'W');
       print_move_terse(m);
+      games++;
     } while (plys++ < 1000 && m.wins == FALSE);
-    printf("\n");
   }
 }
