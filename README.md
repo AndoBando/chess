@@ -1,29 +1,22 @@
-#PGN to FEN converter
+##PGN to FEN converter##
 
-Usage: ./combo (input files...) [-ehkops0] [file...]
-
-
-works on multiple games in the same or separate files
-by default, reads from stdin and outputs to stdout
-pass as many input files as you like
+Usage: `./combo (input files...) [-ehkops0] [file...]`
 
 
--h, help (*this)
+Works on multiple games in the same or separate files.
+By default, reads from stdin and outputs to stdout.
+Pass as many input files as you like
 
--0, no arguments intended. Without this argument, if none are
+`-h`, help (*this)
 
-    given the program throws an error
-    
--p, pretty output, outputs colored ascii board in place of fen
+`-0`, no arguments intended. Without this argument, if none are given the program throws an error
 
--o file, outputs to file instead of stdout
+`-p`, pretty output, outputs colored ascii board in place of fen
 
--e file, redirects errors to file, instead of stderr
+`-o file`, outputs to file instead of stdout
 
--s string, rather than from standard starting positions starts
+`-e file`, redirects errors to file, instead of stderr
 
-    each game from the board given by the fen string
-    
--k, keep tags, keeps the tags given in the pgn file, by default
+`-s string`, rather than from standard starting positions starts each game from the board given by the fen string
 
-    they are thrown out
+`-k`, keep tags, keeps the tags given in the pgn file, by default they are thrown out
