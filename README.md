@@ -1,5 +1,7 @@
 ##PGN to FEN converter##
 
+To run, just compile it with any C compiler. I don't think you should have any problems.
+
 Usage: `./combo (input files...) [-ehkops0] [file...]`
 
 
