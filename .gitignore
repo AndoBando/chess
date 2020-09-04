@@ -1,0 +1,10 @@
+a.out
+pg2fen
+learnheuristic.ipynb
+data/
+games/
+*.ipynb
+winrecs
+pgn2fen
+old/
+out.fen
