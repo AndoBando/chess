@@ -15,4 +15,3 @@ char cfromp(piece p);
 board bfromfen(char* fenstring);
 void fprettyprintboard(FILE* stream, board* b);
 void fprettyprintbits(FILE* stream, U64 bits);
-char* startfen;
